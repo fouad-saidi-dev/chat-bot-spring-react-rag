@@ -3,3 +3,4 @@
 
 ### Asking Chat Bot 
 ![chat bot](captures/screen1.png)
+![chat bot](captures/screen2.png)
