@@ -1,5 +1,6 @@
 package com.fouadev.chatbotspringreactrag.config;
 
+import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.document.Document;
@@ -8,10 +9,10 @@ import org.springframework.ai.reader.pdf.PagePdfDocumentReader;
 import org.springframework.ai.transformer.splitter.TextSplitter;
 import org.springframework.ai.transformer.splitter.TokenTextSplitter;
 import org.springframework.ai.vectorstore.SimpleVectorStore;
+import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
-import org.springframework.context.annotation.Bean;
 import org.springframework.core.io.Resource;
+import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Component;
 
 import java.io.File;
@@ -32,8 +33,16 @@ public class RagDataLoader {
     private Resource resource;
     @Value("store-data-v1.json")
     private String storeFile;
-    @Bean
-    @ConditionalOnMissingBean(SimpleVectorStore.class)
+    private JdbcClient jdbcClient;
+    private VectorStore vectorStore;
+
+    public RagDataLoader(JdbcClient jdbcClient, VectorStore vectorStore) {
+        this.jdbcClient = jdbcClient;
+        this.vectorStore = vectorStore;
+    }
+
+    //@Bean
+    //@ConditionalOnMissingBean(SimpleVectorStore.class)
     public SimpleVectorStore loadData(EmbeddingModel embeddingModel) {
 
             SimpleVectorStore vectorStore = new SimpleVectorStore(embeddingModel);
@@ -56,6 +65,19 @@ public class RagDataLoader {
                 vectorStore.load(file);
             }
             return vectorStore;
+
+    }
+    @PostConstruct
+    public void initStore(){
+        Integer count = jdbcClient.sql("select count(*) from vector_store").query(Integer.class).single();
+        if(count == 0){
+            PagePdfDocumentReader reader = new PagePdfDocumentReader(resource);
+            List<Document> documents = reader.get();
+            TextSplitter textSplitter = new TokenTextSplitter();
+            List<Document> chunks = textSplitter.split(documents);
+            logger.info("Number of document chunks: " + chunks.size());
+            vectorStore.add( chunks);
+        }
 
     }
 
